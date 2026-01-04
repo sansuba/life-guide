@@ -37,6 +37,13 @@ export default function LinksScreen() {
 
   const hasHiddenLinks = links.some(link => link.hidden);
 
+  // Auto-exit hidden view if no more hidden links to show
+  React.useEffect(() => {
+    if (showHidden && !hasHiddenLinks) {
+      setShowHidden(false);
+    }
+  }, [hasHiddenLinks, showHidden, setShowHidden]);
+
   const renderLink = ({ item }: { item: WebLink }) => (
     <TouchableOpacity
       style={[styles.linkCard, isDark && styles.linkCardDark, theme.shadows.sm, item.hidden && styles.hiddenLinkCard]}

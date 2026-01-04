@@ -45,23 +45,25 @@ export default function WebViewScreen() {
       const prevState = appStateRef.current;
       appStateRef.current = state;
 
-      // Clear timer when app goes to background
+      // Start timer when app goes to background/inactive
       if (state === 'inactive' || state === 'background') {
         if (inactivityTimerRef.current) {
           clearTimeout(inactivityTimerRef.current);
         }
+        // Start 10-second timer on app resign active
+        inactivityTimerRef.current = setTimeout(() => {
+          router.back();
+        }, 10000);
       }
 
-      // Restart timer when app comes back to foreground
+      // Clear timer when app comes back to foreground
       if ((prevState === 'inactive' || prevState === 'background') && state === 'active') {
-        handleUserInteraction();
+        if (inactivityTimerRef.current) {
+          clearTimeout(inactivityTimerRef.current);
+          inactivityTimerRef.current = null;
+        }
       }
     });
-
-    // Initialize timer on mount if not web
-    if (Platform.OS !== 'web') {
-      handleUserInteraction();
-    }
 
     return () => {
       subscription.remove();
@@ -69,7 +71,7 @@ export default function WebViewScreen() {
         clearTimeout(inactivityTimerRef.current);
       }
     };
-  }, [handleUserInteraction]);
+  }, [router]);
 
   if (Platform.OS === 'web') {
     return (
