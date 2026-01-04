@@ -72,7 +72,6 @@
     },
     "plugins": [
       "expo-router",
-      "./plugins/withShareIntent",
       [
         "expo-splash-screen",
         {
