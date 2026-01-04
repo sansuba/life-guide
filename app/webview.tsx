@@ -1,0 +1,134 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef } from 'react';
+import { ActivityIndicator, AppState, Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { theme } from '../constants/theme';
+
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  // Only import WebView on native platforms
+  try {
+    // @ts-ignore - require is needed for conditional imports
+    // eslint-disable-next-line
+    const WebViewModule = require('react-native-webview');
+    WebView = WebViewModule.WebView;
+  } catch {
+    // WebView not available
+  }
+}
+
+export default function WebViewScreen() {
+  const params = useLocalSearchParams();
+  const url = decodeURIComponent(params.url as string);
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appStateRef = useRef(AppState.currentState);
+
+  // Function to handle user interaction and reset timer
+  const handleUserInteraction = useCallback(() => {
+    // Clear existing timer
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+
+    // Reset timer for next 10 seconds - auto navigate back to links list
+    inactivityTimerRef.current = setTimeout(() => {
+      router.back();
+    }, 10000); // 10 seconds
+  }, [router]);
+
+  // Handle app state changes (foreground/background)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      const prevState = appStateRef.current;
+      appStateRef.current = state;
+
+      // Clear timer when app goes to background
+      if (state === 'inactive' || state === 'background') {
+        if (inactivityTimerRef.current) {
+          clearTimeout(inactivityTimerRef.current);
+        }
+      }
+
+      // Restart timer when app comes back to foreground
+      if ((prevState === 'inactive' || prevState === 'background') && state === 'active') {
+        handleUserInteraction();
+      }
+    });
+
+    // Initialize timer on mount if not web
+    if (Platform.OS !== 'web') {
+      handleUserInteraction();
+    }
+
+    return () => {
+      subscription.remove();
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [handleUserInteraction]);
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.container, isDark && styles.containerDark]}>
+        <iframe
+          src={url}
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            borderRadius: 8,
+          }}
+          title="Web View"
+          onMouseMove={handleUserInteraction}
+          onScroll={handleUserInteraction}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[styles.container, isDark && styles.containerDark]}
+      onTouchStart={handleUserInteraction}
+    >
+      <WebView
+        source={{ uri: url }}
+        style={styles.webview}
+        startInLoadingState
+        renderLoading={() => (
+          <View style={styles.loading}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        )}
+        onScroll={handleUserInteraction}
+        onLoadEnd={handleUserInteraction}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  containerDark: {
+    backgroundColor: theme.colors.dark.background,
+  },
+  webview: {
+    flex: 1,
+  },
+  loading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

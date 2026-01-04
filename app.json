@@ -1,0 +1,97 @@
+{
+  "expo": {
+    "name": "onspace-app",
+    "slug": "onspace-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "onspaceapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "intentFilters": [
+      {
+        "action": "android.intent.action.SEND",
+        "category": [
+          "android.intent.category.DEFAULT"
+        ],
+        "data": [
+          {
+            "mimeType": "text/plain"
+          },
+          {
+            "mimeType": "image/*"
+          }
+        ]
+      },
+      {
+        "action": "android.intent.action.SEND_MULTIPLE",
+        "category": [
+          "android.intent.category.DEFAULT"
+        ],
+        "data": [
+          {
+            "mimeType": "image/*"
+          }
+        ]
+      }
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "documentTypes": [
+        {
+          "name": "images",
+          "role": "Viewer",
+          "handlerRank": "Alternate",
+          "contentTypes": [
+            "public.image"
+          ]
+        },
+        {
+          "name": "text",
+          "role": "Viewer",
+          "handlerRank": "Alternate",
+          "contentTypes": [
+            "public.plain-text",
+            "public.utf8-plain-text"
+          ]
+        }
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.ss.lsc"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      "./plugins/withShareIntent",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e80208c2-8783-4804-8027-484fb1ffe738"
+      }
+    }
+  }
+}
