@@ -69,9 +69,12 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: isDark ? theme.colors.dark.surface : theme.colors.surface,
           borderTopColor: isDark ? theme.colors.dark.border : theme.colors.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: 70,
+          paddingBottom: 12,
+          paddingTop: 12,
+        },
+        tabBarLabelStyle: {
+          display: 'none',
         },
       }}
     >

@@ -13,6 +13,7 @@ export interface WebLink {
   url: string;
   description?: string;
   pattern?: string; // Pattern string for link grouping
+  patternAction?: 'hide' | 'unhide'; // What the pattern does: hide the link or unhide it
   createdAt: string;
   hidden?: boolean;
 }

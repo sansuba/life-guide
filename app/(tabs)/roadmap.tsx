@@ -26,19 +26,25 @@ export default function RoadmapScreen() {
 
   const renderMilestone = (milestone: Milestone, index: number) => (
     <View key={milestone.id} style={styles.milestoneContainer}>
-      <View style={styles.timelineContainer}>
-        <TouchableOpacity
-          style={[
-            styles.timelineDot,
-            milestone.completed && styles.timelineDotCompleted,
-            isDark && !milestone.completed && styles.timelineDotDark,
-          ]}
-          onPress={() => toggleMilestone(milestone.id)}
-        >
-          {milestone.completed && <Ionicons name="checkmark" size={16} color="#fff" />}
-        </TouchableOpacity>
+      <View style={styles.branchContainer}>
+        <View style={styles.trunkLine}>
+          {index === 0 && <View style={[styles.trunkSegment, isDark && styles.trunkSegmentDark]} />}
+        </View>
+        <View style={styles.branchWrapper}>
+          <View style={[styles.branch, isDark && styles.branchDark]} />
+          <TouchableOpacity
+            style={[
+              styles.branchNode,
+              milestone.completed && styles.branchNodeCompleted,
+              isDark && !milestone.completed && styles.branchNodeDark,
+            ]}
+            onPress={() => toggleMilestone(milestone.id)}
+          >
+            {milestone.completed && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </TouchableOpacity>
+        </View>
         {index < milestones.length - 1 && (
-          <View style={[styles.timelineLine, isDark && styles.timelineLineDark]} />
+          <View style={[styles.trunkSegment, isDark && styles.trunkSegmentDark]} />
         )}
       </View>
       <View style={[styles.milestoneCard, isDark && styles.milestoneCardDark, theme.shadows.sm]}>
@@ -144,38 +150,66 @@ const styles = StyleSheet.create({
   },
   milestoneContainer: {
     flexDirection: 'row',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
-  timelineContainer: {
-    alignItems: 'center',
+  branchContainer: {
+    alignItems: 'flex-end',
     marginRight: theme.spacing.md,
+    width: 60,
+    justifyContent: 'center',
+    position: 'relative',
   },
-  timelineDot: {
+  trunkLine: {
+    width: 2,
+    backgroundColor: theme.colors.border,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+  },
+  trunkSegment: {
+    width: 2,
+    flex: 1,
+    backgroundColor: theme.colors.border,
+  },
+  trunkSegmentDark: {
+    backgroundColor: theme.colors.dark.border,
+  },
+  branchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: 28,
+    width: 100,
+    position: 'relative',
+    zIndex: 10,
+  },
+  branch: {
     width: 32,
-    height: 32,
-    borderRadius: 16,
+    height: 2,
+    backgroundColor: theme.colors.border,
+  },
+  branchDark: {
+    backgroundColor: theme.colors.dark.border,
+  },
+  branchNode: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 2,
     borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: -10,
   },
-  timelineDotDark: {
+  branchNodeDark: {
     backgroundColor: theme.colors.dark.backgroundSecondary,
     borderColor: theme.colors.dark.border,
   },
-  timelineDotCompleted: {
+  branchNodeCompleted: {
     backgroundColor: theme.colors.success,
     borderColor: theme.colors.success,
-  },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: theme.colors.border,
-    marginTop: theme.spacing.xs,
-  },
-  timelineLineDark: {
-    backgroundColor: theme.colors.dark.border,
   },
   milestoneCard: {
     flex: 1,

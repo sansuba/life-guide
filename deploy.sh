@@ -29,3 +29,8 @@ echo ""
 echo "Or upload to Google Play Store:"
 echo "  https://play.google.com/console"
 echo ""
+
+# adb devices
+# $env:Path += ";C:\Users\User.000\AppData\Local\Android\Sdk\platform-tools"; npx expo start --clear --android -- --no-cache
+# adb disconnect
+# adb connect 192.168.8.131:5555

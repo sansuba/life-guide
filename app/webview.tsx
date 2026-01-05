@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, AppStateStatus, NativeModules, PanResponder, Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
 
 let WebView: any = null;
@@ -23,8 +24,58 @@ export default function WebViewScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appStateRef = useRef(AppState.currentState);
+  const panResponderRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+  const swipeStartX = useRef(0);
+  const [isVisible, setIsVisible] = useState(true);
+
+  // Apply FLAG_SECURE when webview loads
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      try {
+        const WindowSecurityModule = NativeModules.WindowSecurityModule;
+        if (WindowSecurityModule?.setSecureWindow) {
+          WindowSecurityModule.setSecureWindow(true);
+        }
+      } catch (e) {
+        console.warn('Could not set secure window flag:', e);
+      }
+    }
+
+    // Cleanup: Remove FLAG_SECURE when leaving webview
+    return () => {
+      if (Platform.OS === 'android') {
+        try {
+          const WindowSecurityModule = NativeModules.WindowSecurityModule;
+          if (WindowSecurityModule?.setSecureWindow) {
+            WindowSecurityModule.setSecureWindow(false);
+          }
+        } catch (e) {
+          console.warn('Could not unset secure window flag:', e);
+        }
+      }
+    };
+  }, []);
+
+  // Initialize pan responder for swipe gesture
+  useEffect(() => {
+    panResponderRef.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        swipeStartX.current = evt.nativeEvent.pageX;
+      },
+      onPanResponderRelease: (evt) => {
+        const swipeEndX = evt.nativeEvent.pageX;
+        const swipeDistance = swipeEndX - swipeStartX.current;
+
+        // If swiped right more than 50 pixels, go back
+        if (swipeDistance > 50) {
+          router.back();
+        }
+      },
+    });
+  }, [router]);
 
   // Handle app state changes (foreground/background)
   useEffect(() => {
@@ -32,31 +83,22 @@ export default function WebViewScreen() {
       const prevState = appStateRef.current;
       appStateRef.current = state;
 
-      // Start timer when app goes to background/inactive
+      // When app goes to background/inactive
       if (state === 'inactive' || state === 'background') {
-        if (inactivityTimerRef.current) {
-          clearTimeout(inactivityTimerRef.current);
-        }
-        // Start 10-second timer on app resign active
-        inactivityTimerRef.current = setTimeout(() => {
-          router.back();
-        }, 10000);
+        // Hide the webview to prevent snapshot
+        setIsVisible(false);
+        // Pop immediately when app resigns active
+        router.back();
       }
 
-      // Clear timer when app comes back to foreground
+      // Show webview again when app comes back to foreground
       if ((prevState === 'inactive' || prevState === 'background') && state === 'active') {
-        if (inactivityTimerRef.current) {
-          clearTimeout(inactivityTimerRef.current);
-          inactivityTimerRef.current = null;
-        }
+        setIsVisible(true);
       }
     });
 
     return () => {
       subscription.remove();
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
     };
   }, [router]);
 
@@ -78,20 +120,27 @@ export default function WebViewScreen() {
   }
 
   return (
-    <View
-      style={[styles.container, isDark && styles.containerDark]}
-    >
-      <WebView
-        source={{ uri: url }}
-        style={styles.webview}
-        startInLoadingState
-        renderLoading={() => (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        )}
-      />
-    </View>
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top', 'left', 'right']}>
+      {isVisible ? (
+        <View
+          style={styles.webview}
+          {...panResponderRef.current?.panHandlers}
+        >
+          <WebView
+            source={{ uri: url }}
+            style={styles.webviewContent}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.loading}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+              </View>
+            )}
+          />
+        </View>
+      ) : (
+        <View style={styles.blankContainer} />
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -105,6 +154,13 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  webviewContent: {
+    flex: 1,
+  },
+  blankContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
   loading: {
     position: 'absolute',

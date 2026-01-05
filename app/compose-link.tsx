@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { View, StyleSheet, useColorScheme, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useLinks } from '../hooks/useLinks';
-import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
-import { theme } from '../constants/theme';
 import { useAlert } from '@/template';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { theme } from '../constants/theme';
+import { useLinks } from '../hooks/useLinks';
 
 export default function ComposeLinkScreen() {
   const [title, setTitle] = useState('');
@@ -34,14 +35,15 @@ export default function ComposeLinkScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, isDark && styles.containerDark]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.flexContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
         <Input
           label="Title"
           value={title}
@@ -68,7 +70,8 @@ export default function ComposeLinkScreen() {
           disabled={!title || !url}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -79,6 +82,9 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: theme.colors.dark.background,
+  },
+  flexContainer: {
+    flex: 1,
   },
   content: {
     padding: theme.spacing.md,

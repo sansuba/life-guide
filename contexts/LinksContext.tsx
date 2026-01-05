@@ -11,6 +11,11 @@ interface LinksContextType {
   deleteLink: (id: string) => void;
   hideLink: (id: string) => void;
   unhideLink: (id: string) => void;
+  attachPatternToLink: (linkId: string, pattern: string, action?: 'hide' | 'unhide') => void;
+  removePatternFromLink: (linkId: string) => void;
+  hideLinksWithPattern: (pattern: string) => void;
+  showLinksWithPattern: (pattern: string) => void;
+  unhideLinksWithPattern: (pattern: string) => void;
   showHidden: boolean;
   setShowHidden: (show: boolean) => void;
 }
@@ -89,8 +94,48 @@ export function LinksProvider({ children }: { children: ReactNode }) {
     saveLinks(updated);
   };
 
+  const hideLinksWithPattern = (pattern: string) => {
+    const updated = links.map(link =>
+      link.pattern === pattern ? { ...link, hidden: true } : link
+    );
+    setLinks(updated);
+    saveLinks(updated);
+  };
+
+  const showLinksWithPattern = (pattern: string) => {
+    const updated = links.map(link =>
+      link.pattern === pattern ? { ...link, hidden: false } : link
+    );
+    setLinks(updated);
+    saveLinks(updated);
+  };
+
+  const attachPatternToLink = (linkId: string, pattern: string, action: 'hide' | 'unhide' = 'hide') => {
+    const updated = links.map(link =>
+      link.id === linkId ? { ...link, pattern, patternAction: action } : link
+    );
+    setLinks(updated);
+    saveLinks(updated);
+  };
+
+  const removePatternFromLink = (linkId: string) => {
+    const updated = links.map(link =>
+      link.id === linkId ? { ...link, pattern: undefined, patternAction: undefined } : link
+    );
+    setLinks(updated);
+    saveLinks(updated);
+  };
+
+  const unhideLinksWithPattern = (pattern: string) => {
+    const updated = links.map(link =>
+      link.pattern === pattern && link.patternAction === 'unhide' ? { ...link, hidden: false } : link
+    );
+    setLinks(updated);
+    saveLinks(updated);
+  };
+
   return (
-    <LinksContext.Provider value={{ links, addLink, deleteLink, hideLink, unhideLink, showHidden, setShowHidden }}>
+    <LinksContext.Provider value={{ links, addLink, deleteLink, hideLink, unhideLink, attachPatternToLink, removePatternFromLink, hideLinksWithPattern, showLinksWithPattern, unhideLinksWithPattern, showHidden, setShowHidden }}>
       {children}
     </LinksContext.Provider>
   );

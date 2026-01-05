@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { theme } from '../constants/theme';
@@ -46,14 +47,15 @@ export default function ComposeMilestoneScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, isDark && styles.containerDark]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.flexContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
         <Input
           label="Milestone Title"
           value={title}
@@ -132,7 +134,8 @@ export default function ComposeMilestoneScreen() {
           disabled={!title || !note}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -143,6 +146,9 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: theme.colors.dark.background,
+  },
+  flexContainer: {
+    flex: 1,
   },
   content: {
     padding: theme.spacing.md,

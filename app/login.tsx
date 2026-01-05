@@ -2,7 +2,8 @@ import { useAlert } from '@/template';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { theme } from '../constants/theme';
@@ -20,6 +21,9 @@ export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { showAlert } = useAlert();
+  const insets = useSafeAreaInsets();
+  const scaleAnim = new Animated.Value(0.8);
+  const opacityAnim = new Animated.Value(0);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -83,22 +87,47 @@ export default function LoginScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
             <View style={styles.setupContainer}>
-              <View style={[styles.iconCircle, isDark && styles.iconCircleDark]}>
+              <Animated.View
+                style={[
+                  styles.iconCircle,
+                  isDark && styles.iconCircleDark,
+                  {
+                    transform: [{ scale: scaleAnim }],
+                    opacity: opacityAnim,
+                  },
+                ]}
+              >
                 <Ionicons
                   name="finger-print"
                   size={64}
                   color={theme.colors.primary}
                 />
-              </View>
+              </Animated.View>
               <Text style={[styles.setupTitle, isDark && styles.setupTitleDark]}>
-                Enable Biometric Auth
+                Secure Your Account
               </Text>
               <Text style={[styles.setupSubtitle, isDark && styles.setupSubtitleDark]}>
-                Faster, more secure login using your fingerprint or face
+                Use your biometric for faster, safer access
               </Text>
+
+              <View style={styles.benefitsContainer}>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.benefitText, isDark && styles.benefitTextDark]}>Quick access</Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.benefitText, isDark && styles.benefitTextDark]}>More secure</Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.benefitText, isDark && styles.benefitTextDark]}>Easy to use</Text>
+                </View>
+              </View>
 
               <View style={styles.buttonContainer}>
                 <Button
@@ -126,40 +155,68 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
+    <SafeAreaView
       style={[styles.container, isDark && styles.containerDark]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      edges={['top', 'left', 'right']}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={[styles.container, isDark && styles.containerDark]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.content, { paddingTop: insets.top }]}>
           <View style={styles.header}>
+              <View style={[styles.logoCircle, isDark && styles.logoCircleDark]}>
+                <Ionicons
+                  name="book"
+                  size={40}
+                  color={theme.colors.primary}
+                />
+              </View>
             <Text style={[styles.title, isDark && styles.titleDark]}>Life Guide</Text>
             <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
-              Create account or sign in
-            </Text>
-            <View style={[styles.mockBadge, isDark && styles.mockBadgeDark]}>
-              <Text style={[styles.mockText, isDark && styles.mockTextDark]}>LOCAL ACCOUNTS</Text>
-            </View>
+                Secure personal knowledge hub
+              </Text>
           </View>
 
           <View style={styles.form}>
-            <Input
-              label="Username"
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Enter username"
-            />
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter password"
-              secureTextEntry={!showPassword}
-              onToggleSecure={(secure) => setShowPassword(!secure)}
-            />
+              <View style={styles.inputGroup}>
+                <View style={styles.inputLabel}>
+                  <Ionicons name="person" size={16} color={theme.colors.primary} />
+                  <Text style={[styles.label, isDark && styles.labelDark]}>Username</Text>
+                </View>
+                <Input
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Choose a username"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <View style={styles.inputLabel}>
+                  <Ionicons name="lock-closed" size={16} color={theme.colors.primary} />
+                  <Text style={[styles.label, isDark && styles.labelDark]}>Password</Text>
+                </View>
+                <Input
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Set your password"
+                  secureTextEntry={!showPassword}
+                  onToggleSecure={(secure) => setShowPassword(!secure)}
+                />
+              </View>
+
+              <View style={styles.hintContainer}>
+                <Ionicons name="information-circle" size={16} color={theme.colors.textSecondary} />
+                <Text style={[styles.hint, isDark && styles.hintDark]}>
+                  Account created automatically on first login
+                </Text>
+              </View>
+
             <View style={styles.buttonContainer}>
               <Button
                 title="Sign In / Create Account"
@@ -176,23 +233,19 @@ export default function LoginScreen() {
               >
                 <Ionicons
                   name="finger-print"
-                  size={20}
+                    size={22}
                   color={isDark ? theme.colors.dark.primary : theme.colors.primary}
                 />
                 <Text style={[styles.biometricText, isDark && styles.biometricTextDark]}>
                   Sign in with biometric
                 </Text>
               </TouchableOpacity>
-            )}
-
-            <Text style={[styles.hint, isDark && styles.hintDark]}>
-              Account created automatically on first login
-
-            </Text>
+              )}
           </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -211,15 +264,30 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
   },
   header: {
     alignItems: 'center',
     marginBottom: theme.spacing.xxl,
   },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${theme.colors.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  logoCircleDark: {
+    backgroundColor: `${theme.colors.primary}20`,
+  },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
+    fontSize: 32,
+    fontWeight: '700',
   },
   titleDark: {
     color: theme.colors.dark.text,
@@ -227,43 +295,50 @@ const styles = StyleSheet.create({
   subtitle: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.md,
   },
   subtitleDark: {
     color: theme.colors.dark.textSecondary,
   },
-  mockBadge: {
-    backgroundColor: theme.colors.warning,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-  },
-  mockBadgeDark: {
-    backgroundColor: theme.colors.warning,
-  },
-  mockText: {
-    ...theme.typography.caption,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  mockTextDark: {
-    color: '#fff',
-  },
   form: {
     width: '100%',
+    gap: theme.spacing.lg,
   },
-  buttonContainer: {
-    marginTop: theme.spacing.md,
-    gap: theme.spacing.md,
+  inputGroup: {
+    gap: theme.spacing.sm,
+  },
+  inputLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.xs,
+  },
+  label: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
+  labelDark: {
+    color: theme.colors.dark.text,
+  },
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: `${theme.colors.primary}10`,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
   },
   hint: {
+    flex: 1,
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginTop: theme.spacing.md,
   },
   hintDark: {
     color: theme.colors.dark.textSecondary,
+  },
+  buttonContainer: {
+    gap: theme.spacing.md,
   },
   biometricButton: {
     flexDirection: 'row',
@@ -271,18 +346,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.background,
+    backgroundColor: `${theme.colors.primary}08`,
     gap: theme.spacing.sm,
   },
   biometricButtonDark: {
     borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.dark.surface,
+    backgroundColor: `${theme.colors.primary}08`,
   },
   biometricText: {
     ...theme.typography.button,
     color: theme.colors.primary,
+    fontWeight: '600',
   },
   biometricTextDark: {
     color: theme.colors.primary,
@@ -290,12 +366,13 @@ const styles = StyleSheet.create({
   setupContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
   },
   iconCircle: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: theme.colors.primaryLight || `${theme.colors.primary}20`,
+    backgroundColor: `${theme.colors.primary}15`,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.spacing.lg,
@@ -307,6 +384,8 @@ const styles = StyleSheet.create({
     ...theme.typography.h2,
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
+    fontSize: 24,
+    fontWeight: '700',
   },
   setupTitleDark: {
     color: theme.colors.dark.text,
@@ -315,10 +394,31 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
   },
   setupSubtitleDark: {
     color: theme.colors.dark.textSecondary,
+  },
+  benefitsContainer: {
+    backgroundColor: `${theme.colors.primary}08`,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  benefitText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    fontWeight: '500',
+  },
+  benefitTextDark: {
+    color: theme.colors.dark.text,
   },
   skipButton: {
     paddingVertical: theme.spacing.md,
@@ -327,6 +427,7 @@ const styles = StyleSheet.create({
   skipText: {
     ...theme.typography.button,
     color: theme.colors.textSecondary,
+    fontWeight: '500',
   },
   skipTextDark: {
     color: theme.colors.dark.textSecondary,

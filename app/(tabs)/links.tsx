@@ -1,4 +1,3 @@
-import { useAlert } from '@/template';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -11,18 +10,26 @@ import type { WebLink } from '../../types';
 
 
 export default function LinksScreen() {
-  const { links, deleteLink, hideLink, unhideLink, showHidden, setShowHidden } = useLinks();
+  const { links, showHidden, setShowHidden, attachPatternToLink } = useLinks();
   const router = useRouter();
-  const { showAlert } = useAlert();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [search, setSearch] = React.useState('');
   const [showPatternDraw, setShowPatternDraw] = React.useState(false);
-  const [drawnPattern, setDrawnPattern] = React.useState<string | null>(null);
+  const [selectedLinkId, setSelectedLinkId] = React.useState<string | null>(null);
+  const [patternMode, setPatternMode] = React.useState<'attach' | 'unlock'>('attach');
 
-  // Filter links by search query and hidden status
+  // Check if search is for "hidden"
+  const isSearchingForHidden = search.toLowerCase().includes('hidden');
+
+  // Filter links - hide any that have a pattern attached
   const filteredLinks = React.useMemo(() => {
+    // If searching for "hidden", show all hidden/pattern items
+    if (isSearchingForHidden) {
+      return links.filter(link => link.hidden || link.pattern);
+    }
+
     let result = links.filter(link => {
       const q = search.toLowerCase();
       const matchesSearch = (
@@ -31,68 +38,76 @@ export default function LinksScreen() {
         (link.description && link.description.toLowerCase().includes(q))
       );
 
+      // Hide links that have a pattern attached
+      const hasPattern = !!link.pattern;
+
       if (showHidden) {
-        return link.hidden && matchesSearch;
+        // Show both hidden links and links with patterns in hidden view
+        return (link.hidden || hasPattern) && matchesSearch;
       }
-      return !link.hidden && matchesSearch;
+      // In normal view, hide links that have patterns or are marked hidden
+      return !link.hidden && !hasPattern && matchesSearch;
     });
 
-    // If pattern is drawn, filter by pattern
-    if (drawnPattern) {
-      result = result.filter(link => link.pattern === drawnPattern);
-    }
-
     return result;
-  }, [links, search, showHidden, drawnPattern]);
+  }, [links, search, showHidden, isSearchingForHidden]);
 
-  const hasHiddenLinks = links.some(link => link.hidden);
+  const hasHiddenLinks = links.some(link => link.hidden || link.pattern);
 
-  // Auto-exit hidden view if no more hidden links to show
+  // Auto-exit hidden view if no more hidden/pattern links to show
   React.useEffect(() => {
     if (showHidden && !hasHiddenLinks) {
       setShowHidden(false);
     }
   }, [hasHiddenLinks, showHidden, setShowHidden]);
 
-  const handlePatternDraw = (pattern: string) => {
-    setDrawnPattern(pattern);
-  };
+  const handlePatternDraw = (pattern: string, _shouldHide?: boolean, action?: 'hide' | 'unhide') => {
+    if (selectedLinkId) {
+      const selectedLink = links.find(l => l.id === selectedLinkId);
 
-  const clearPatternFilter = () => {
-    setDrawnPattern(null);
+      if (patternMode === 'unlock' && selectedLink?.pattern) {
+        // Check if drawn pattern matches the link's pattern
+        if (pattern === selectedLink.pattern) {
+          // Pattern matched - close dialog and redirect to webview
+          router.push(`/webview?url=${encodeURIComponent(selectedLink.url)}&title=${encodeURIComponent(selectedLink.title)}`);
+          setSelectedLinkId(null);
+          setPatternMode('attach');
+          setShowPatternDraw(false);
+        }
+      } else if (patternMode === 'attach') {
+        // Attach the pattern to the link with the chosen action
+        attachPatternToLink(selectedLinkId, pattern, action || 'hide');
+        setSelectedLinkId(null);
+        setPatternMode('attach');
+      }
+    }
+    setShowPatternDraw(false);
   };
 
   const renderLink = ({ item }: { item: WebLink }) => (
     <TouchableOpacity
-      style={[styles.linkCard, isDark && styles.linkCardDark, theme.shadows.sm, item.hidden && styles.hiddenLinkCard]}
-      onPress={() => !item.hidden && router.push(`/webview?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}`)}
+      style={[styles.linkCard, isDark && styles.linkCardDark, theme.shadows.sm, item.hidden && styles.hiddenLinkCard, item.pattern && styles.lockedLinkCard]}
+      onPress={() => {
+        if (item.hidden) {
+          // Hidden links can't be opened
+          return;
+        }
+
+        if (item.pattern) {
+          // Pattern-protected: open pattern draw to unlock
+          setSelectedLinkId(item.id);
+          setPatternMode('unlock');
+          setShowPatternDraw(true);
+        } else {
+          // Regular link: open directly
+          router.push(`/webview?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}`);
+        }
+      }}
       onLongPress={() => {
-        const actions: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = showHidden
-          ? [
-            { text: 'Unhide', onPress: () => unhideLink(item.id), style: 'default' as const },
-            { text: 'Cancel', onPress: () => { }, style: 'cancel' as const },
-          ]
-          : [
-            { text: 'Hide', onPress: () => hideLink(item.id), style: 'default' as const },
-            {
-              text: 'Delete', onPress: () => {
-                showAlert(
-                  'Delete Bookmark',
-                  'Are you sure you want to delete this bookmark? This action cannot be undone.',
-                  [
-                    { text: 'Cancel', onPress: () => { }, style: 'cancel' as const },
-                    {
-                      text: 'Delete',
-                      onPress: () => deleteLink(item.id),
-                      style: 'destructive' as const,
-                    },
-                  ]
-                );
-              }, style: 'destructive' as const
-            },
-            { text: 'Cancel', onPress: () => { }, style: 'cancel' as const },
-          ];
-        showAlert(item.title, '', actions);
+        // Long press: attach or change pattern
+        setSelectedLinkId(item.id);
+        setPatternMode('attach');
+        setShowPatternDraw(true);
       }}
       delayLongPress={500}
     >
@@ -108,88 +123,48 @@ export default function LinksScreen() {
             {item.description}
           </Text>
         )}
+        {item.pattern && !showHidden && (
+          <View style={[styles.lockBadge, isDark && styles.lockBadgeDark]}>
+            <Ionicons name="lock-closed" size={12} color={theme.colors.primary} />
+            <Text style={[styles.lockBadgeText, isDark && styles.lockBadgeTextDark]}>
+              Draw pattern to unlock
+            </Text>
+          </View>
+        )}
       </View>
-      {!showHidden && (
-        <TouchableOpacity
-          onPress={() => {
-            showAlert(
-              'Delete Bookmark',
-              'Are you sure you want to delete this bookmark? This action cannot be undone.',
-              [
-                { text: 'Cancel', onPress: () => { }, style: 'cancel' },
-                {
-                  text: 'Delete',
-                  onPress: () => deleteLink(item.id),
-                  style: 'destructive',
-                },
-              ]
-            );
-          }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name="trash-outline"
-            size={20}
-            color={isDark ? theme.colors.dark.textSecondary : theme.colors.textSecondary}
-          />
-        </TouchableOpacity>
-      )}
     </TouchableOpacity>
   );
 
   return (
     <View style={[styles.container, isDark && styles.containerDark, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TextInput
-          style={[
-            styles.searchBar,
-            isDark && styles.searchBarDark
-          ]}
-          placeholder={showHidden ? "Search hidden bookmarks..." : "Search bookmarks..."}
-          placeholderTextColor={isDark ? theme.colors.dark.textTertiary : theme.colors.textTertiary}
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-        />
-        <View style={styles.headerActions}>
-          {hasHiddenLinks && (
-            <TouchableOpacity
-              onPress={() => setShowHidden(!showHidden)}
-              style={[styles.viewToggleButton, isDark && styles.viewToggleButtonDark, showHidden && styles.viewToggleButtonActive]}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name={showHidden ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color={showHidden ? theme.colors.primary : (isDark ? theme.colors.dark.textSecondary : theme.colors.textSecondary)}
-              />
-            </TouchableOpacity>
-          )}
-          {drawnPattern && (
-            <TouchableOpacity
-              onPress={clearPatternFilter}
-              style={[styles.patternButton, isDark && styles.patternButtonDark]}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={theme.colors.primary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
+        <TouchableOpacity
+          onPress={() => {
+            // Tap search bar to exit hidden view
+            if (showHidden) {
+              setShowHidden(false);
+              setSearch('');
+            }
+          }}
+          activeOpacity={0.7}
+          style={{ flex: 1 }}
+        >
+          <TextInput
+            style={[
+              styles.searchBar,
+              isDark && styles.searchBarDark
+            ]}
+            placeholder={showHidden ? "Search hidden bookmarks..." : "Search bookmarks..."}
+            placeholderTextColor={isDark ? theme.colors.dark.textTertiary : theme.colors.textTertiary}
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            editable={!showHidden}
+          />
+        </TouchableOpacity>
       </View>
-      {drawnPattern && (
-        <View style={[styles.patternInfo, isDark && styles.patternInfoDark]}>
-          <Ionicons name="grid-outline" size={16} color={theme.colors.primary} />
-          <Text style={[styles.patternInfoText, isDark && styles.patternInfoTextDark]}>
-            Pattern: {drawnPattern}
-          </Text>
-        </View>
-      )}
       {filteredLinks.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons
@@ -198,7 +173,7 @@ export default function LinksScreen() {
             color={isDark ? theme.colors.dark.textTertiary : theme.colors.textTertiary}
           />
           <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>
-            {drawnPattern ? "No links for this pattern" : (showHidden ? "No hidden bookmarks" : "No bookmarks found")}
+            {isSearchingForHidden ? "No hidden bookmarks" : (showHidden ? "No hidden bookmarks" : "No bookmarks found")}
           </Text>
           <Text style={[styles.emptySubtext, isDark && styles.emptySubtextDark]}>
             {links.length === 0 ? 'Tap the + button to add your first link' : 'Try a different search'}
@@ -214,8 +189,10 @@ export default function LinksScreen() {
       )}
       <TouchableOpacity
         onPress={() => router.push('/compose-link')}
-        onLongPress={() => setShowPatternDraw(true)}
-        delayLongPress={500}
+        onLongPress={() => {
+          // Toggle between show and hide hidden list views
+          setShowHidden(!showHidden);
+        }}
         style={{
           position: 'absolute',
           right: theme.spacing.md,
@@ -234,6 +211,13 @@ export default function LinksScreen() {
         visible={showPatternDraw}
         onClose={() => setShowPatternDraw(false)}
         onPatternDraw={handlePatternDraw}
+        mode={patternMode}
+        links={links}
+        onNavigate={(url, title) => {
+          setShowPatternDraw(false);
+          setSelectedLinkId(null);
+          router.push(`/webview?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`);
+        }}
       />
     </View>
   );
@@ -262,13 +246,14 @@ const styles = StyleSheet.create({
   searchBar: {
     flex: 1,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.surface,
     color: theme.colors.text,
     fontSize: 16,
     borderWidth: 1,
     borderColor: theme.colors.borderLight,
+    minHeight: 44,
   },
   searchBarDark: {
     backgroundColor: theme.colors.dark.surface,
@@ -328,6 +313,55 @@ const styles = StyleSheet.create({
   },
   patternInfoTextDark: {
     color: theme.colors.primaryLight,
+  },
+  patternBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: theme.colors.primaryLight,
+    borderRadius: theme.borderRadius.sm,
+    alignSelf: 'flex-start',
+  },
+  patternBadgeDark: {
+    backgroundColor: `${theme.colors.primary}20`,
+  },
+  patternBadgeText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  patternBadgeTextDark: {
+    color: theme.colors.primaryLight,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: `${theme.colors.primary}10`,
+    borderRadius: theme.borderRadius.sm,
+    alignSelf: 'flex-start',
+  },
+  lockBadgeDark: {
+    backgroundColor: `${theme.colors.primary}15`,
+  },
+  lockBadgeText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  lockBadgeTextDark: {
+    color: theme.colors.primaryLight,
+  },
+  lockedLinkCard: {
+    opacity: 0.7,
   },
   listContent: {
     paddingHorizontal: theme.spacing.md,

@@ -10,6 +10,8 @@ import {
     useColorScheme,
     View,
 } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
+import type { WebLink } from '../../types';
 
 interface Point {
     x: number;
@@ -19,19 +21,58 @@ interface Point {
 interface PatternDrawProps {
     visible: boolean;
     onClose: () => void;
-    onPatternDraw: (pattern: string) => void;
+    onPatternDraw: (pattern: string, shouldHide?: boolean, action?: 'hide' | 'unhide') => void;
+    mode?: 'hide' | 'attach' | 'unlock'; // 'hide' for group hiding, 'attach' for link attachment, 'unlock' for pattern verification
+    links?: WebLink[]; // For auto-navigation on pattern match
+    onNavigate?: (url: string, title: string) => void; // Callback for navigation
 }
 
-export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProps) => {
+export const PatternDraw = ({ visible, onClose, onPatternDraw, mode = 'hide', links = [], onNavigate }: PatternDrawProps) => {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const [points, setPoints] = React.useState<Point[]>([]);
     const [patternCode, setPatternCode] = React.useState('');
+    const [patternAction, setPatternAction] = React.useState<'hide' | 'unhide'>('hide'); // Changed to action-based
+    const [currentPosition, setCurrentPosition] = React.useState<Point | null>(null); // Track current finger position for smooth line
     const canvasRef = useRef<View>(null);
+    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
     const gridSize = 3;
-    const dotRadius = 20;
     const canvasSize = 300;
     const cellSize = canvasSize / gridSize;
+
+    // Set up auto-close timer when modal becomes visible
+    React.useEffect(() => {
+        if (visible) {
+            // Start 5 second idle timer
+            idleTimerRef.current = setTimeout(() => {
+                setPoints([]);
+                setPatternCode('');
+                setPatternAction('hide');
+                setCurrentPosition(null);
+                onClose();
+            }, 5000);
+
+            return () => {
+                if (idleTimerRef.current) {
+                    clearTimeout(idleTimerRef.current);
+                }
+            };
+        }
+    }, [visible, onClose]);
+
+    // Reset idle timer whenever user starts drawing
+    const resetIdleTimer = () => {
+        if (idleTimerRef.current) {
+            clearTimeout(idleTimerRef.current);
+        }
+        idleTimerRef.current = setTimeout(() => {
+            setPoints([]);
+            setPatternCode('');
+            setPatternAction('hide');
+            setCurrentPosition(null);
+            onClose();
+        }, 5000);
+    };
 
     // Create 3x3 grid of points for pattern
     const createGridPoints = () => {
@@ -52,9 +93,13 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
     const handleCanvasPress = (event: any) => {
         const { locationX, locationY } = event.nativeEvent;
 
-        // Find closest grid point
+        // Reset idle timer when user starts interacting
+        resetIdleTimer();
+
+        // Find closest grid point - only connect if finger is directly on the dot
         let closest: { point: Point; index: number } | null = null;
         let minDistance = Infinity;
+        const touchRadius = 28; // Increased to 28px for quicker linking
 
         for (let i = 0; i < gridPoints.length; i++) {
             const point = gridPoints[i];
@@ -62,9 +107,20 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
                 Math.pow(locationX - point.x, 2) + Math.pow(locationY - point.y, 2)
             );
 
-            if (distance < minDistance && distance < 50) {
+            if (distance < minDistance && distance < touchRadius) {
                 minDistance = distance;
                 closest = { point, index: i };
+            }
+        }
+
+        // Show preview line only when finger is on a dot
+        if (points.length > 0) {
+            if (closest) {
+                // Only show line when finger is exactly on a dot
+                setCurrentPosition({ x: closest.point.x, y: closest.point.y });
+            } else {
+                // Clear preview line when finger is not on a dot
+                setCurrentPosition(null);
             }
         }
 
@@ -81,9 +137,50 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
         }
     };
 
+    const checkPatternMatch = (pattern: string) => {
+        if (mode === 'unlock' && pattern.length >= 4) {
+            // Look for a matching pattern in the links
+            const matchedLink = links.find(link => link.pattern === pattern);
+            if (matchedLink && onNavigate) {
+                // Found a match - navigate immediately
+                onNavigate(matchedLink.url, matchedLink.title);
+                resetPattern();
+                onClose();
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const handleCanvasRelease = () => {
+        // Clear the current position line
+        setCurrentPosition(null);
+
+        // Check if pattern matches any existing link pattern when gesture is lost
+        if (patternCode.length >= 4) {
+            const matched = checkPatternMatch(patternCode);
+
+            // If no match, reset after 1 second to let user see the complete pattern
+            if (!matched) {
+                setTimeout(() => {
+                    resetPattern();
+                }, 1000);
+            }
+        } else if (patternCode.length > 0) {
+            // If pattern is incomplete, clear after 1 second
+            setTimeout(() => {
+                resetPattern();
+            }, 1000);
+        }
+    };
+
     const handleSubmit = () => {
         if (patternCode.length >= 4) {
-            onPatternDraw(patternCode);
+            // Check for auto-match first
+            if (!checkPatternMatch(patternCode)) {
+                // No match, use normal flow
+                onPatternDraw(patternCode, mode === 'attach' ? undefined : patternAction === 'hide', mode === 'attach' ? patternAction : undefined);
+            }
             resetPattern();
             onClose();
         }
@@ -92,6 +189,7 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
     const resetPattern = () => {
         setPoints([]);
         setPatternCode('');
+        setPatternAction('hide');
     };
 
     const handleCancel = () => {
@@ -110,30 +208,57 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
                 <View style={[styles.overlay, isDark && styles.overlayDark]}>
                     <TouchableWithoutFeedback>
                         <View style={[styles.container, isDark && styles.containerDark]}>
-                            <View style={styles.header}>
-                                <Text style={[styles.title, isDark && styles.titleDark]}>
-                                    Draw Pattern
-                                </Text>
-                                <TouchableOpacity onPress={handleCancel}>
-                                    <Ionicons
-                                        name="close"
-                                        size={24}
-                                        color={isDark ? theme.colors.dark.text : theme.colors.text}
-                                    />
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
-                                Connect at least 4 dots to create a pattern
-                            </Text>
-
                             <View
                                 ref={canvasRef}
                                 style={[styles.canvas, isDark && styles.canvasDark]}
                                 onStartShouldSetResponder={() => true}
                                 onResponderGrant={handleCanvasPress}
                                 onResponderMove={handleCanvasPress}
+                                onResponderRelease={handleCanvasRelease}
                             >
+                                {/* SVG overlay for smooth lines */}
+                                <Svg
+                                    width={canvasSize}
+                                    height={canvasSize}
+                                    style={styles.svgOverlay}
+                                    pointerEvents="none"
+                                >
+                                    {/* Draw lines between connected points */}
+                                    {points.length > 1 && points.map((point, index) => {
+                                        if (index === 0) return null;
+                                        const prevPoint = points[index - 1];
+                                        return (
+                                            <Line
+                                                key={`line-${index}`}
+                                                x1={prevPoint.x}
+                                                y1={prevPoint.y}
+                                                x2={point.x}
+                                                y2={point.y}
+                                                stroke={theme.colors.primary}
+                                                strokeWidth="4"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                opacity="0.7"
+                                            />
+                                        );
+                                    })}
+
+                                    {/* Draw live line from last point to current finger position */}
+                                    {points.length > 0 && currentPosition !== null && (
+                                        <Line
+                                            x1={points[points.length - 1].x}
+                                            y1={points[points.length - 1].y}
+                                            x2={currentPosition.x}
+                                            y2={currentPosition.y}
+                                            stroke={theme.colors.primary}
+                                            strokeWidth="4"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            opacity="0.7"
+                                        />
+                                    )}
+                                </Svg>
+
                                 {/* Grid dots */}
                                 {gridPoints.map((point, index) => {
                                     const isInPattern = points.some(p => p.x === point.x && p.y === point.y);
@@ -141,74 +266,78 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
                                         <View
                                             key={index}
                                             style={[
-                                                styles.dot,
+                                                styles.dotContainer,
                                                 {
-                                                    left: point.x - dotRadius / 2,
-                                                    top: point.y - dotRadius / 2,
+                                                    left: point.x - (isInPattern ? 14 : 8),
+                                                    top: point.y - (isInPattern ? 14 : 8),
                                                 },
-                                                isInPattern && styles.dotActive,
-                                            ]}
-                                        >
-                                            <View
-                                                style={[
-                                                    styles.dotInner,
-                                                    isInPattern && styles.dotInnerActive,
-                                                ]}
-                                            />
-                                        </View>
-                                    );
-                                })}
-
-                                {/* Connection lines */}
-                                {points.map((point, index) => {
-                                    if (index === 0) return null;
-                                    const prevPoint = points[index - 1];
-                                    return (
-                                        <View
-                                            key={`line-${index}`}
-                                            style={[
-                                                styles.line,
-                                                {
-                                                    left: prevPoint.x,
-                                                    top: prevPoint.y,
-                                                    width: Math.sqrt(
-                                                        Math.pow(point.x - prevPoint.x, 2) +
-                                                        Math.pow(point.y - prevPoint.y, 2)
-                                                    ),
-                                                    transform: [
-                                                        {
-                                                            rotate: `${Math.atan2(
-                                                                point.y - prevPoint.y,
-                                                                point.x - prevPoint.x
-                                                            )}rad`,
-                                                        },
-                                                    ],
-                                                },
+                                                isInPattern && styles.dotContainerActive,
                                             ]}
                                         />
                                     );
                                 })}
                             </View>
 
-                            <View style={styles.info}>
-                                <Text style={[styles.infoText, isDark && styles.infoTextDark]}>
-                                    Pattern: {patternCode.length > 0 ? patternCode : 'Empty'}
-                                </Text>
-                                <Text style={[styles.infoSubtext, isDark && styles.infoSubtextDark]}>
-                                    {patternCode.length < 4
-                                        ? `${4 - patternCode.length} more dots needed`
-                                        : 'Ready to save!'}
-                                </Text>
-                            </View>
+                            {/* Action selector for attach mode */}
+                            {mode === 'attach' && (
+                                <View style={styles.actionContainer}>
+                                    <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>
+                                        Pattern Action:
+                                    </Text>
+                                    <View style={styles.actionButtonsGroup}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.actionButton,
+                                                patternAction === 'hide' && styles.actionButtonActive,
+                                                isDark && styles.actionButtonDark,
+                                            ]}
+                                            onPress={() => setPatternAction('hide')}
+                                        >
+                                            <Ionicons
+                                                name="eye-off"
+                                                size={18}
+                                                color={patternAction === 'hide' ? theme.colors.primary : (isDark ? theme.colors.dark.textSecondary : theme.colors.textSecondary)}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.actionButtonText,
+                                                    patternAction === 'hide' && styles.actionButtonTextActive,
+                                                    isDark && styles.actionButtonTextDark,
+                                                ]}
+                                            >
+                                                Hide
+                                            </Text>
+                                        </TouchableOpacity>
 
-                            <View style={styles.buttonContainer}>
-                                <TouchableOpacity
-                                    style={[styles.button, styles.resetButton]}
-                                    onPress={resetPattern}
-                                >
-                                    <Text style={styles.resetButtonText}>Reset</Text>
-                                </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.actionButton,
+                                                patternAction === 'unhide' && styles.actionButtonActive,
+                                                isDark && styles.actionButtonDark,
+                                            ]}
+                                            onPress={() => setPatternAction('unhide')}
+                                        >
+                                            <Ionicons
+                                                name="eye"
+                                                size={18}
+                                                color={patternAction === 'unhide' ? theme.colors.primary : (isDark ? theme.colors.dark.textSecondary : theme.colors.textSecondary)}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.actionButtonText,
+                                                    patternAction === 'unhide' && styles.actionButtonTextActive,
+                                                    isDark && styles.actionButtonTextDark,
+                                                ]}
+                                            >
+                                                Unhide
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
 
+                            {/* Submit button only shown for attach mode */}
+                            {mode === 'attach' && (
                                 <TouchableOpacity
                                     style={[
                                         styles.button,
@@ -218,9 +347,11 @@ export const PatternDraw = ({ visible, onClose, onPatternDraw }: PatternDrawProp
                                     onPress={handleSubmit}
                                     disabled={patternCode.length < 4}
                                 >
-                                    <Text style={styles.submitButtonText}>Save Pattern</Text>
+                                    <Text style={styles.submitButtonText}>
+                                        Attach Pattern
+                                    </Text>
                                 </TouchableOpacity>
-                            </View>
+                            )}
                         </View>
                     </TouchableWithoutFeedback>
                 </View>
@@ -249,27 +380,6 @@ const styles = StyleSheet.create({
     containerDark: {
         backgroundColor: theme.colors.dark.surface,
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: theme.spacing.md,
-    },
-    title: {
-        ...theme.typography.h2,
-        color: theme.colors.text,
-    },
-    titleDark: {
-        color: theme.colors.dark.text,
-    },
-    subtitle: {
-        ...theme.typography.body,
-        color: theme.colors.textSecondary,
-        marginBottom: theme.spacing.md,
-    },
-    subtitleDark: {
-        color: theme.colors.dark.textSecondary,
-    },
     canvas: {
         width: 300,
         height: 300,
@@ -294,6 +404,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    dotContainer: {
+        position: 'absolute',
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: theme.colors.textTertiary,
+    },
+    dotContainerActive: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: theme.colors.primary,
+    },
     dotInner: {
         width: 12,
         height: 12,
@@ -309,56 +432,95 @@ const styles = StyleSheet.create({
         height: 18,
         borderRadius: 9,
     },
-    line: {
+    svgOverlay: {
         position: 'absolute',
-        height: 3,
-        backgroundColor: theme.colors.primary,
-        opacity: 0.7,
+        top: 0,
+        left: 0,
     },
-    info: {
-        backgroundColor: theme.colors.backgroundSecondary,
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.md,
+    hideToggle: {
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        marginBottom: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.borderLight,
+        backgroundColor: theme.colors.surface,
+        gap: theme.spacing.sm,
     },
-    infoText: {
-        ...theme.typography.body,
-        color: theme.colors.text,
-        fontFamily: 'monospace',
-        fontSize: 14,
+    hideToggleActive: {
+        backgroundColor: `${theme.colors.primary}15`,
+        borderColor: theme.colors.primary,
     },
-    infoTextDark: {
-        color: theme.colors.dark.text,
-    },
-    infoSubtext: {
+    hideToggleText: {
         ...theme.typography.bodySmall,
         color: theme.colors.textSecondary,
-        marginTop: theme.spacing.xs,
+        flex: 1,
     },
-    infoSubtextDark: {
+    hideToggleTextActive: {
+        color: theme.colors.primary,
+        fontWeight: '600',
+    },
+    actionContainer: {
+        marginBottom: theme.spacing.md,
+    },
+    actionLabel: {
+        ...theme.typography.bodySmall,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing.sm,
+        fontWeight: '600',
+    },
+    actionLabelDark: {
         color: theme.colors.dark.textSecondary,
+    },
+    actionButtonsGroup: {
+        flexDirection: 'row',
+        gap: theme.spacing.sm,
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.borderLight,
+        backgroundColor: theme.colors.surface,
+        gap: theme.spacing.xs,
+    },
+    actionButtonDark: {
+        backgroundColor: theme.colors.dark.surface,
+        borderColor: theme.colors.dark.border,
+    },
+    actionButtonActive: {
+        backgroundColor: `${theme.colors.primary}15`,
+        borderColor: theme.colors.primary,
+    },
+    actionButtonText: {
+        ...theme.typography.bodySmall,
+        color: theme.colors.textSecondary,
+        fontWeight: '500',
+    },
+    actionButtonTextDark: {
+        color: theme.colors.dark.textSecondary,
+    },
+    actionButtonTextActive: {
+        color: theme.colors.primary,
+        fontWeight: '600',
     },
     buttonContainer: {
         flexDirection: 'row',
         gap: theme.spacing.md,
     },
     button: {
-        flex: 1,
         paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
         borderRadius: theme.borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    resetButton: {
-        backgroundColor: theme.colors.surface,
-        borderWidth: 1,
-        borderColor: theme.colors.borderLight,
-    },
-    resetButtonText: {
-        ...theme.typography.body,
-        color: theme.colors.text,
-        fontWeight: '600',
     },
     submitButton: {
         backgroundColor: theme.colors.primary,

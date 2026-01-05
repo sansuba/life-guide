@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "onspace-app",
-    "slug": "onspace-app",
+    "name": "Life Guide",
+    "slug": "life-guide",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",

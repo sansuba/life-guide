@@ -48,9 +48,9 @@ function RootLayoutContent() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="compose-note" options={{ presentation: 'modal', headerShown: true, title: 'New Note' }} />
-      <Stack.Screen name="compose-link" options={{ presentation: 'modal', headerShown: true, title: 'Add Link' }} />
-      <Stack.Screen name="webview" options={{ headerShown: true, title: 'Browser' }} />
+      <Stack.Screen name="compose-note" options={{ presentation: 'modal', headerShown: false }} />
+      <Stack.Screen name="compose-link" options={{ presentation: 'modal', headerShown: false }} />
+      <Stack.Screen name="webview" options={{ headerShown: false }} />
     </Stack>
   );
 }
