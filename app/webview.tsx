@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, AppState, Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { ActivityIndicator, AppState, AppStateStatus, Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { theme } from '../constants/theme';
 
 let WebView: any = null;
@@ -26,22 +26,9 @@ export default function WebViewScreen() {
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appStateRef = useRef(AppState.currentState);
 
-  // Function to handle user interaction and reset timer
-  const handleUserInteraction = useCallback(() => {
-    // Clear existing timer
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-    }
-
-    // Reset timer for next 10 seconds - auto navigate back to links list
-    inactivityTimerRef.current = setTimeout(() => {
-      router.back();
-    }, 10000); // 10 seconds
-  }, [router]);
-
   // Handle app state changes (foreground/background)
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
+    const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
       const prevState = appStateRef.current;
       appStateRef.current = state;
 
@@ -85,8 +72,6 @@ export default function WebViewScreen() {
             borderRadius: 8,
           }}
           title="Web View"
-          onMouseMove={handleUserInteraction}
-          onScroll={handleUserInteraction}
         />
       </View>
     );
@@ -95,7 +80,6 @@ export default function WebViewScreen() {
   return (
     <View
       style={[styles.container, isDark && styles.containerDark]}
-      onTouchStart={handleUserInteraction}
     >
       <WebView
         source={{ uri: url }}
@@ -106,8 +90,6 @@ export default function WebViewScreen() {
             <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
         )}
-        onScroll={handleUserInteraction}
-        onLoadEnd={handleUserInteraction}
       />
     </View>
   );

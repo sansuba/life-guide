@@ -12,6 +12,7 @@ export interface WebLink {
   title: string;
   url: string;
   description?: string;
+  pattern?: string; // Pattern string for link grouping
   createdAt: string;
   hidden?: boolean;
 }

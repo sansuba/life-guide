@@ -1,11 +1,10 @@
-
 import { useAlert } from '@/template';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FAB } from '../../components/ui/FAB';
+import { PatternDraw } from '../../components/ui/PatternDraw';
 import { theme } from '../../constants/theme';
 import { useLinks } from '../../hooks/useLinks';
 import type { WebLink } from '../../types';
@@ -19,21 +18,32 @@ export default function LinksScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [search, setSearch] = React.useState('');
+  const [showPatternDraw, setShowPatternDraw] = React.useState(false);
+  const [drawnPattern, setDrawnPattern] = React.useState<string | null>(null);
 
   // Filter links by search query and hidden status
-  const filteredLinks = links.filter(link => {
-    const q = search.toLowerCase();
-    const matchesSearch = (
-      link.title.toLowerCase().includes(q) ||
-      link.url.toLowerCase().includes(q) ||
-      (link.description && link.description.toLowerCase().includes(q))
-    );
+  const filteredLinks = React.useMemo(() => {
+    let result = links.filter(link => {
+      const q = search.toLowerCase();
+      const matchesSearch = (
+        link.title.toLowerCase().includes(q) ||
+        link.url.toLowerCase().includes(q) ||
+        (link.description && link.description.toLowerCase().includes(q))
+      );
 
-    if (showHidden) {
-      return link.hidden && matchesSearch;
+      if (showHidden) {
+        return link.hidden && matchesSearch;
+      }
+      return !link.hidden && matchesSearch;
+    });
+
+    // If pattern is drawn, filter by pattern
+    if (drawnPattern) {
+      result = result.filter(link => link.pattern === drawnPattern);
     }
-    return !link.hidden && matchesSearch;
-  });
+
+    return result;
+  }, [links, search, showHidden, drawnPattern]);
 
   const hasHiddenLinks = links.some(link => link.hidden);
 
@@ -43,6 +53,14 @@ export default function LinksScreen() {
       setShowHidden(false);
     }
   }, [hasHiddenLinks, showHidden, setShowHidden]);
+
+  const handlePatternDraw = (pattern: string) => {
+    setDrawnPattern(pattern);
+  };
+
+  const clearPatternFilter = () => {
+    setDrawnPattern(null);
+  };
 
   const renderLink = ({ item }: { item: WebLink }) => (
     <TouchableOpacity
@@ -135,20 +153,43 @@ export default function LinksScreen() {
           autoCorrect={false}
           clearButtonMode="while-editing"
         />
-        {hasHiddenLinks && (
-          <TouchableOpacity
-            onPress={() => setShowHidden(!showHidden)}
-            style={[styles.viewToggleButton, isDark && styles.viewToggleButtonDark, showHidden && styles.viewToggleButtonActive]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons
-              name={showHidden ? "eye-off-outline" : "eye-outline"}
-              size={20}
-              color={showHidden ? theme.colors.primary : (isDark ? theme.colors.dark.textSecondary : theme.colors.textSecondary)}
-            />
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {hasHiddenLinks && (
+            <TouchableOpacity
+              onPress={() => setShowHidden(!showHidden)}
+              style={[styles.viewToggleButton, isDark && styles.viewToggleButtonDark, showHidden && styles.viewToggleButtonActive]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={showHidden ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color={showHidden ? theme.colors.primary : (isDark ? theme.colors.dark.textSecondary : theme.colors.textSecondary)}
+              />
+            </TouchableOpacity>
+          )}
+          {drawnPattern && (
+            <TouchableOpacity
+              onPress={clearPatternFilter}
+              style={[styles.patternButton, isDark && styles.patternButtonDark]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={theme.colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
+      {drawnPattern && (
+        <View style={[styles.patternInfo, isDark && styles.patternInfoDark]}>
+          <Ionicons name="grid-outline" size={16} color={theme.colors.primary} />
+          <Text style={[styles.patternInfoText, isDark && styles.patternInfoTextDark]}>
+            Pattern: {drawnPattern}
+          </Text>
+        </View>
+      )}
       {filteredLinks.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons
@@ -157,7 +198,7 @@ export default function LinksScreen() {
             color={isDark ? theme.colors.dark.textTertiary : theme.colors.textTertiary}
           />
           <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>
-            {showHidden ? "No hidden bookmarks" : "No bookmarks found"}
+            {drawnPattern ? "No links for this pattern" : (showHidden ? "No hidden bookmarks" : "No bookmarks found")}
           </Text>
           <Text style={[styles.emptySubtext, isDark && styles.emptySubtextDark]}>
             {links.length === 0 ? 'Tap the + button to add your first link' : 'Try a different search'}
@@ -171,7 +212,29 @@ export default function LinksScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
         />
       )}
-      <FAB onPress={() => router.push('/compose-link')} />
+      <TouchableOpacity
+        onPress={() => router.push('/compose-link')}
+        onLongPress={() => setShowPatternDraw(true)}
+        delayLongPress={500}
+        style={{
+          position: 'absolute',
+          right: theme.spacing.md,
+          bottom: theme.spacing.md,
+          width: 56,
+          height: 56,
+          borderRadius: theme.borderRadius.full,
+          zIndex: 10,
+        } as const}
+      >
+        <View style={[styles.fabWrapper]}>
+          <Ionicons name="add" size={24} color="#fff" />
+        </View>
+      </TouchableOpacity>
+      <PatternDraw
+        visible={showPatternDraw}
+        onClose={() => setShowPatternDraw(false)}
+        onPatternDraw={handlePatternDraw}
+      />
     </View>
   );
 }
@@ -190,6 +253,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
     gap: theme.spacing.sm,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    alignItems: 'center',
   },
   searchBar: {
     flex: 1,
@@ -224,6 +292,42 @@ const styles = StyleSheet.create({
   viewToggleButtonActive: {
     backgroundColor: theme.colors.primaryLight,
     borderColor: theme.colors.primary,
+  },
+  patternButton: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  patternButtonDark: {
+    backgroundColor: theme.colors.dark.surface,
+    borderColor: theme.colors.dark.border,
+  },
+  patternInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.primaryLight,
+    borderRadius: theme.borderRadius.md,
+    gap: theme.spacing.sm,
+  },
+  patternInfoDark: {
+    backgroundColor: `${theme.colors.primary}20`,
+  },
+  patternInfoText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  patternInfoTextDark: {
+    color: theme.colors.primaryLight,
   },
   listContent: {
     paddingHorizontal: theme.spacing.md,
@@ -306,5 +410,13 @@ const styles = StyleSheet.create({
   },
   emptySubtextDark: {
     color: theme.colors.dark.textTertiary,
+  },
+  fabWrapper: {
+    flex: 1,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    ...theme.shadows.lg,
   },
 });

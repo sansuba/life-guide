@@ -13,7 +13,7 @@ echo ""
 
 echo "📦 Step 2: Note - For local APK generation:"
 echo "   Download the AAB from EAS, then run:"
-echo "   java -jar bundletool-all-1.18.3.jar build-apks --bundle=app.aab --output=app.apks --mode=universal"
+echo "   java -jar bundletool-all.jar build-apks --bundle=app.aab --output=app.apks --mode=universal"
 echo "   unzip -j app.apks universal.apk && mv universal.apk app.apk"
 echo ""
 
